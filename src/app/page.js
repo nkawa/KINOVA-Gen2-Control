@@ -1,148 +1,158 @@
 "use client";
 import * as React from 'react'
 import Controller from './controller.js'
+import 'aframe';
+import { THREE } from 'aframe';
+import mqtt from 'mqtt';
+import { v4 as uuidv4 } from 'uuid';  // for unique ID 
+
+const uniqueId = uuidv4(); // constant ID for client.
+var vr_init_first = true;
 
 export default function Home() {
-  const [rendered,set_rendered] = React.useState(false)
+  const [rendered, set_rendered] = React.useState(false)
   const robotNameList = ["KINOVA Gen2"]
-  const [robotName,set_robotName] = React.useState(robotNameList[0])
-  const [rotate,set_rotate] = React.useState({j1:0,j2:0,j3:0,j4:0,j5:0,j6:0})
-  const [c_pos,set_c_pos] = React.useState({x:0,y:0.5,z:1.2})
-  const [c_deg,set_c_deg] = React.useState({x:0,y:0,z:0})
-  const [source,set_source] = React.useState({x:0,y:0,z:0})
-  const [target,set_target] = React.useState({x:0,y:1.4,z:0})
-  const [joint_length,set_joint_length] = React.useState([])
-  const [nodes,set_nodes] = React.useState([])
-  const [node1,set_node1] = React.useState({x:0,y:0,z:0})
-  const [node2,set_node2] = React.useState({x:0,y:0,z:0})
-  const [box_scale,set_box_scale] = React.useState("0.03 0.03 0.03")
-  const [box_visible,set_box_visible] = React.useState(true)
+  const [robotName, set_robotName] = React.useState(robotNameList[0])
+  const [rotate, set_rotate] = React.useState({ j1: 0, j2: 0, j3: 0, j4: 0, j5: 0, j6: 0 })
+  const [c_pos, set_c_pos] = React.useState({ x: 0, y: 0.5, z: 1.2 })
+  const [c_deg, set_c_deg] = React.useState({ x: 0, y: 0, z: 0 })
+  const [source, set_source] = React.useState({ x: 0, y: 0, z: 0 })
+  const [target, set_target] = React.useState({ x: 0, y: 1.4, z: 0 })
+  const [joint_length, set_joint_length] = React.useState([])
+  const [nodes, set_nodes] = React.useState([])
+  const [node1, set_node1] = React.useState({ x: 0, y: 0, z: 0 })
+  const [node2, set_node2] = React.useState({ x: 0, y: 0, z: 0 })
+  const [box_scale, set_box_scale] = React.useState("0.03 0.03 0.03")
+  const [box_visible, set_box_visible] = React.useState(true)
+  const ref_target = React.useRef(target);
+
+
   let registered = false
 
   const joint_pos = {
-    base:{x:0,y:0,z:0},j1:{x:0,y:0,z:0},
-    j2:{x:0,y:0.2755,z:0},j3:{x:0,y:0.41,z:0},j4:{x:0.00974,y:0.2075,z:0},
-    j5:{x:0.00026,y:0.1035,z:0},j6:{x:-0.00025,y:0.104,z:0},
-    j7:{x:0,y:0.1145,z:0},j8:{x:0,y:0.05,z:0}
+    base: { x: 0, y: 0, z: 0 }, j1: { x: 0, y: 0, z: 0 },
+    j2: { x: 0, y: 0.2755, z: 0 }, j3: { x: 0, y: 0.41, z: 0 }, j4: { x: 0.00974, y: 0.2075, z: 0 },
+    j5: { x: 0.00026, y: 0.1035, z: 0 }, j6: { x: -0.00025, y: 0.104, z: 0 },
+    j7: { x: 0, y: 0.1145, z: 0 }, j8: { x: 0, y: 0.05, z: 0 }
   }
 
-  const distance = (s_pos, t_pos)=>{
+  const distance = (s_pos, t_pos) => {
     return Math.sqrt((t_pos.x - s_pos.x) ** 2 + (t_pos.y - s_pos.y) ** 2 + (t_pos.z - s_pos.z) ** 2);
   }
 
-  const distance2Dx = (s_pos, t_pos)=>{
+  const distance2Dx = (s_pos, t_pos) => {
     return Math.sqrt((t_pos.y - s_pos.y) ** 2 + (t_pos.z - s_pos.z) ** 2);
   }
 
-  const distance2Dz = (s_pos, t_pos)=>{
+  const distance2Dz = (s_pos, t_pos) => {
     return Math.sqrt((t_pos.x - s_pos.x) ** 2 + (t_pos.y - s_pos.y) ** 2);
   }
 
-  const pos_add = (pos1, pos2)=>{
-    return {x:(pos1.x + pos2.x), y:(pos1.y + pos2.y), z:(pos1.z + pos2.z)}
+  const pos_add = (pos1, pos2) => {
+    return { x: (pos1.x + pos2.x), y: (pos1.y + pos2.y), z: (pos1.z + pos2.z) }
   }
 
-  const pos_sub = (pos1, pos2)=>{
-    return {x:(pos1.x - pos2.x), y:(pos1.y - pos2.y), z:(pos1.z - pos2.z)}
+  const pos_sub = (pos1, pos2) => {
+    return { x: (pos1.x - pos2.x), y: (pos1.y - pos2.y), z: (pos1.z - pos2.z) }
   }
 
-  const getPoint  = (t,s,l)=>{
-    const p = {x:0,y:0,z:0}
-    const d = distance(s,t)
+  const getPoint = (t, s, l) => {
+    const p = { x: 0, y: 0, z: 0 }
+    const d = distance(s, t)
 
-    const dx = (t.x-s.x)/d
-    const dy = (t.y-s.y)/d
-    const dz = (t.z-s.z)/d
+    const dx = (t.x - s.x) / d
+    const dy = (t.y - s.y) / d
+    const dz = (t.z - s.z) / d
 
-    p.x = Math.round((t.x - dx*l)*10000)/10000
-    p.y = Math.round((t.y - dy*l)*10000)/10000
-    p.z = Math.round((t.z - dz*l)*10000)/10000
+    p.x = Math.round((t.x - dx * l) * 10000) / 10000
+    p.y = Math.round((t.y - dy * l) * 10000) / 10000
+    p.z = Math.round((t.z - dz * l) * 10000) / 10000
 
     return p
   }
 
-  const getPoint2Dx  = (t,s,l)=>{
-    const p = {x:0,y:0,z:0}
-    const d = distance2Dx(s,t)
+  const getPoint2Dx = (t, s, l) => {
+    const p = { x: 0, y: 0, z: 0 }
+    const d = distance2Dx(s, t)
 
-    const dy = (t.y-s.y)/d
-    const dz = (t.z-s.z)/d
+    const dy = (t.y - s.y) / d
+    const dz = (t.z - s.z) / d
 
-    p.y = Math.round((t.y - dy*l)*10000)/10000
-    p.z = Math.round((t.z - dz*l)*10000)/10000
-
-    return p
-  }
-
-  const getPoint2Dz  = (t,s,l)=>{
-    const p = {x:0,y:0,z:0}
-    const d = distance2Dz(s,t)
-
-    const dx = (t.x-s.x)/d
-    const dy = (t.y-s.y)/d
-
-    p.x = Math.round((t.x - dx*l)*10000)/10000
-    p.y = Math.round((t.y - dy*l)*10000)/10000
+    p.y = Math.round((t.y - dy * l) * 10000) / 10000
+    p.z = Math.round((t.z - dz * l) * 10000) / 10000
 
     return p
   }
 
-  const FABRIK = (st,tg,nd)=>{
+  const getPoint2Dz = (t, s, l) => {
+    const p = { x: 0, y: 0, z: 0 }
+    const d = distance2Dz(s, t)
+
+    const dx = (t.x - s.x) / d
+    const dy = (t.y - s.y) / d
+
+    p.x = Math.round((t.x - dx * l) * 10000) / 10000
+    p.y = Math.round((t.y - dy * l) * 10000) / 10000
+
+    return p
+  }
+
+  const FABRIK = (st, tg, nd) => {
     const wknd = [...nd]
     const len = wknd.length - 1
-    if((tg.x - st.x) === 0 && wknd.findIndex((e)=>e.x != 0) < 0){
-      if(wknd.findIndex((e)=>e.z != 0) < 0){
+    if ((tg.x - st.x) === 0 && wknd.findIndex((e) => e.x != 0) < 0) {
+      if (wknd.findIndex((e) => e.z != 0) < 0) {
         wknd[1].z = 0.01
       }
-      for(let i=0;i<25;i++){
+      for (let i = 0; i < 25; i++) {
         wknd[len].x = tg.x
         wknd[len].y = tg.y
         wknd[len].z = tg.z
-        for(let j=1;j<=len;j++){
-          wknd[len-j] = getPoint2Dx(wknd[len-j+1],wknd[len-j],joint_length[len-j]);
+        for (let j = 1; j <= len; j++) {
+          wknd[len - j] = getPoint2Dx(wknd[len - j + 1], wknd[len - j], joint_length[len - j]);
         }
-  
+
         wknd[0].x = st.x
         wknd[0].y = st.y
         wknd[0].z = st.z
-        for(let j=1;j<=len;j++){
-          wknd[j] = getPoint2Dx(wknd[j-1],wknd[j],joint_length[j-1]);
+        for (let j = 1; j <= len; j++) {
+          wknd[j] = getPoint2Dx(wknd[j - 1], wknd[j], joint_length[j - 1]);
         }
       }
-    }else
-    if((tg.z - st.z) === 0 && wknd.findIndex((e)=>e.z != 0) < 0){
-      for(let i=0;i<25;i++){
-        wknd[len].x = tg.x
-        wknd[len].y = tg.y
-        wknd[len].z = tg.z
-        for(let j=1;j<=len;j++){
-          wknd[len-j] = getPoint2Dz(wknd[len-j+1],wknd[len-j],joint_length[len-j]);
+    } else
+      if ((tg.z - st.z) === 0 && wknd.findIndex((e) => e.z != 0) < 0) {
+        for (let i = 0; i < 25; i++) {
+          wknd[len].x = tg.x
+          wknd[len].y = tg.y
+          wknd[len].z = tg.z
+          for (let j = 1; j <= len; j++) {
+            wknd[len - j] = getPoint2Dz(wknd[len - j + 1], wknd[len - j], joint_length[len - j]);
+          }
+
+          wknd[0].x = st.x
+          wknd[0].y = st.y
+          wknd[0].z = st.z
+          for (let j = 1; j <= len; j++) {
+            wknd[j] = getPoint2Dz(wknd[j - 1], wknd[j], joint_length[j - 1]);
+          }
         }
-  
-        wknd[0].x = st.x
-        wknd[0].y = st.y
-        wknd[0].z = st.z
-        for(let j=1;j<=len;j++){
-          wknd[j] = getPoint2Dz(wknd[j-1],wknd[j],joint_length[j-1]);
+      } else {
+        for (let i = 0; i < 25; i++) {
+          wknd[len].x = tg.x
+          wknd[len].y = tg.y
+          wknd[len].z = tg.z
+          for (let j = 1; j <= len; j++) {
+            wknd[len - j] = getPoint(wknd[len - j + 1], wknd[len - j], joint_length[len - j]);
+          }
+
+          wknd[0].x = st.x
+          wknd[0].y = st.y
+          wknd[0].z = st.z
+          for (let j = 1; j <= len; j++) {
+            wknd[j] = getPoint(wknd[j - 1], wknd[j], joint_length[j - 1]);
+          }
         }
       }
-    }else{
-      for(let i=0;i<25;i++){
-        wknd[len].x = tg.x
-        wknd[len].y = tg.y
-        wknd[len].z = tg.z
-        for(let j=1;j<=len;j++){
-          wknd[len-j] = getPoint(wknd[len-j+1],wknd[len-j],joint_length[len-j]);
-        }
-  
-        wknd[0].x = st.x
-        wknd[0].y = st.y
-        wknd[0].z = st.z
-        for(let j=1;j<=len;j++){
-          wknd[j] = getPoint(wknd[j-1],wknd[j],joint_length[j-1]);
-        }
-      }
-    }
     set_nodes([...wknd])
   }
 
@@ -158,119 +168,119 @@ export default function Home() {
     set_source(setNode[0])
 
     set_joint_length([
-      distance(setNode[0],setNode[1]),
-      distance(setNode[1],setNode[2]),
-      distance(setNode[2],setNode[3]),
+      distance(setNode[0], setNode[1]),
+      distance(setNode[1], setNode[2]),
+      distance(setNode[2], setNode[3]),
       0,
     ])
-  },[])
+  }, [])
 
   React.useEffect(() => {
-    if(nodes.length > 0){
-      FABRIK(source,target,nodes)
+    if (nodes.length > 0) {
+      FABRIK(source, target, nodes)
     }
-  },[target])
+  }, [target])
 
-  const degree_base = (s_pos, t_pos, side_a, side_b)=>{
+  const degree_base = (s_pos, t_pos, side_a, side_b) => {
     const side_c = distance(s_pos, t_pos)
     const diff_x = (t_pos.x + 10) - (s_pos.x + 10)
     const diff_y = (t_pos.y + 10) - (s_pos.y + 10)
     const diff_z = (t_pos.z + 10) - (s_pos.z + 10)
-    let angle_base = Math.atan2(Math.sqrt(side_c ** 2 - diff_y ** 2), diff_y)*180/Math.PI
-    let direction = Math.atan2(diff_x, diff_z)*180/Math.PI
-    if(isNaN(angle_base)) angle_base = 0
-    if(isNaN(direction)) direction = 0
+    let angle_base = Math.atan2(Math.sqrt(side_c ** 2 - diff_y ** 2), diff_y) * 180 / Math.PI
+    let direction = Math.atan2(diff_x, diff_z) * 180 / Math.PI
+    if (isNaN(angle_base)) angle_base = 0
+    if (isNaN(direction)) direction = 0
 
-    let angle_B = Math.acos((side_a ** 2 + side_c ** 2 - side_b ** 2) / (2 * side_a * side_c))*180/Math.PI
-    let angle_C = Math.acos((side_a ** 2 + side_b ** 2 - side_c ** 2) / (2 * side_a * side_b))*180/Math.PI
+    let angle_B = Math.acos((side_a ** 2 + side_c ** 2 - side_b ** 2) / (2 * side_a * side_c)) * 180 / Math.PI
+    let angle_C = Math.acos((side_a ** 2 + side_b ** 2 - side_c ** 2) / (2 * side_a * side_b)) * 180 / Math.PI
 
-    if(isNaN(angle_B)) angle_B = 0
-    if(isNaN(angle_C)) angle_C = 0
+    if (isNaN(angle_B)) angle_B = 0
+    if (isNaN(angle_C)) angle_C = 0
 
     const angle1 = angle_base - angle_B
     const angle2 = angle_C === 0 ? 0 : 180 - angle_C
 
-    return {direction, angle_base, angle1, angle2}
+    return { direction, angle_base, angle1, angle2 }
   }
 
-  const degree = (s_pos, t_pos)=>{
+  const degree = (s_pos, t_pos) => {
     const len = distance(s_pos, t_pos)
     const diff_x = (t_pos.x + 10) - (s_pos.x + 10)
     const diff_y = (t_pos.y + 10) - (s_pos.y + 10)
     const diff_z = (t_pos.z + 10) - (s_pos.z + 10)
 
-    let degree_x = Math.atan2(Math.sqrt(len ** 2 - diff_y ** 2), diff_y)*180/Math.PI
-    let degree_y = Math.atan2(diff_x, diff_z)*180/Math.PI
+    let degree_x = Math.atan2(Math.sqrt(len ** 2 - diff_y ** 2), diff_y) * 180 / Math.PI
+    let degree_y = Math.atan2(diff_x, diff_z) * 180 / Math.PI
 
-    if(isNaN(degree_x)) degree_x = 0
-    if(isNaN(degree_y)) degree_y = 0
+    if (isNaN(degree_x)) degree_x = 0
+    if (isNaN(degree_y)) degree_y = 0
 
-    return {x:degree_x,y:degree_y}
+    return { x: degree_x, y: degree_y }
   }
 
-  const calc_side_1 = (syahen, kakudo)=>{
-    const teihen = Math.abs(kakudo)===90  ? 0:(syahen * Math.cos(kakudo/180*Math.PI))
-    const takasa = Math.abs(kakudo)===180 ? 0:(syahen * Math.sin(kakudo/180*Math.PI))
-    return {a:teihen, b:takasa}
+  const calc_side_1 = (syahen, kakudo) => {
+    const teihen = Math.abs(kakudo) === 90 ? 0 : (syahen * Math.cos(kakudo / 180 * Math.PI))
+    const takasa = Math.abs(kakudo) === 180 ? 0 : (syahen * Math.sin(kakudo / 180 * Math.PI))
+    return { a: teihen, b: takasa }
   }
 
-  const calc_side_2 = (teihen, takasa)=>{
+  const calc_side_2 = (teihen, takasa) => {
     const syahen = Math.sqrt(teihen ** 2 + takasa ** 2)
-    const kakudo = Math.atan2(teihen, takasa)*180/Math.PI
-    return {s:syahen, k:kakudo}
+    const kakudo = Math.atan2(teihen, takasa) * 180 / Math.PI
+    return { s: syahen, k: kakudo }
   }
 
   React.useEffect(() => {
-    if(nodes.length > 0){
-      const wkrotate = {...rotate}
-      const deg1 = degree_base(nodes[0],nodes[2],joint_length[0],joint_length[1])
+    if (nodes.length > 0) {
+      const wkrotate = { ...rotate }
+      const deg1 = degree_base(nodes[0], nodes[2], joint_length[0], joint_length[1])
       wkrotate.j1 = deg1.direction
       wkrotate.j2 = deg1.angle1
       wkrotate.j3 = deg1.angle2
 
-      const {a:node1y, b:node1r} = calc_side_1(joint_length[0],deg1.angle1)
-      const node1x = Math.abs(deg1.direction)===180 ? 0:(node1r * Math.sin(deg1.direction/180*Math.PI))
-      const node1z = Math.abs(deg1.direction)===90  ? 0:(node1r * Math.cos(deg1.direction/180*Math.PI))
-      const node1pos = pos_add(joint_pos.j2,{x:node1x, y:node1y, z:node1z})
+      const { a: node1y, b: node1r } = calc_side_1(joint_length[0], deg1.angle1)
+      const node1x = Math.abs(deg1.direction) === 180 ? 0 : (node1r * Math.sin(deg1.direction / 180 * Math.PI))
+      const node1z = Math.abs(deg1.direction) === 90 ? 0 : (node1r * Math.cos(deg1.direction / 180 * Math.PI))
+      const node1pos = pos_add(joint_pos.j2, { x: node1x, y: node1y, z: node1z })
 
       const second_base_pos = nodes[2]
-      const {x:degree_x,y:degree_y} = degree(node1pos,second_base_pos)
-      const relativepos = pos_sub(nodes[3],second_base_pos)
-      const {s:hankei, k:kakudo} = calc_side_2(relativepos.x,relativepos.z)
+      const { x: degree_x, y: degree_y } = degree(node1pos, second_base_pos)
+      const relativepos = pos_sub(nodes[3], second_base_pos)
+      const { s: hankei, k: kakudo } = calc_side_2(relativepos.x, relativepos.z)
       const relativedeg = kakudo - degree_y
-      const wkpos1x = hankei * Math.sin(relativedeg/180*Math.PI)
-      const wkpos1z = hankei * Math.cos(relativedeg/180*Math.PI)
-      const wkpos1 = {x:wkpos1x,y:relativepos.y,z:wkpos1z}
+      const wkpos1x = hankei * Math.sin(relativedeg / 180 * Math.PI)
+      const wkpos1z = hankei * Math.cos(relativedeg / 180 * Math.PI)
+      const wkpos1 = { x: wkpos1x, y: relativepos.y, z: wkpos1z }
 
-      const {s:hankei2, k:kakudo2} = calc_side_2(wkpos1z,relativepos.y)
+      const { s: hankei2, k: kakudo2 } = calc_side_2(wkpos1z, relativepos.y)
       const relativedeg2 = kakudo2 - degree_x
-      const wkpos2z = hankei2 * Math.sin(relativedeg2/180*Math.PI)
-      const wkpos2y = hankei2 * Math.cos(relativedeg2/180*Math.PI)
+      const wkpos2z = hankei2 * Math.sin(relativedeg2 / 180 * Math.PI)
+      const wkpos2y = hankei2 * Math.cos(relativedeg2 / 180 * Math.PI)
 
-      const wkpos2 = {x:wkpos1x,y:wkpos2y,z:wkpos2z}
-      const {x:wkpos1_deg_x,y:wkpos1_deg_y} = degree({x:0,y:0,z:0},wkpos2)
-      set_node1(pos_add(second_base_pos,wkpos1))
-      set_node2(pos_add(second_base_pos,wkpos2))
+      const wkpos2 = { x: wkpos1x, y: wkpos2y, z: wkpos2z }
+      const { x: wkpos1_deg_x, y: wkpos1_deg_y } = degree({ x: 0, y: 0, z: 0 }, wkpos2)
+      set_node1(pos_add(second_base_pos, wkpos1))
+      set_node2(pos_add(second_base_pos, wkpos2))
 
       let setj4 = wkpos1_deg_y
-      if((deg1.angle1 + deg1.angle2) >= 180){
-        if(setj4 < 0){
+      if ((deg1.angle1 + deg1.angle2) >= 180) {
+        if (setj4 < 0) {
           setj4 += 180
-        }else{
+        } else {
           setj4 -= 180
         }
       }
       wkrotate.j4 = (setj4)
       wkrotate.j5 = (wkpos1_deg_x)
 
-      set_rotate({...wkrotate})
+      set_rotate({ ...wkrotate })
     }
-  },[nodes])
+  }, [nodes])
 
-  const robotChange = ()=>{
-    const get = (robotName)=>{
-      let changeIdx = robotNameList.findIndex((e)=>e===robotName) + 1
-      if(changeIdx >= robotNameList.length){
+  const robotChange = () => {
+    const get = (robotName) => {
+      let changeIdx = robotNameList.findIndex((e) => e === robotName) + 1
+      if (changeIdx >= robotNameList.length) {
         changeIdx = 0
       }
       return robotNameList[changeIdx]
@@ -278,17 +288,173 @@ export default function Home() {
     set_robotName(get)
   }
 
+  // 自分のIPを取得
+  const [ip, setIp] = React.useState('');
+  React.useEffect(() => {
+    fetch('/mqapi/get-ip')
+      .then(response => response.json())
+      .then(data => setIp(data.clientIP))
+      .catch(error => console.error('Error fetching IP:', error));
+  }, []);
+
+  const sendCurrentMQTT = (el) => {
+    const msg = JSON.stringify(
+      {
+        grip: el.grip,
+        toggle: el.toggle,
+        pos: el.object3D.position,
+        ori: el.object3D.rotation,
+      }
+    );
+    el.client.publish('kinova/state', msg);
+  }
+
+  const flStr = (v) => {
+    return Math.floor(v * 100) / 100;
+  }
+
+  const doTick = (el) => {
+    const text = document.getElementById("my_controller");// 
+    const pos = el.object3D.position;
+    const rot = el.object3D.rotation;
+    //    const th = new THREE.Vector3();
+    //    el.object3D.getWorldPosition(th);
+    //        const rotstr = `(${this.flStr(rot.x)}, ${this.flStr(rot.y)}, ${this.flStr(rot.z)})`;
+    //    const rotstr = `(${flStr(th.x)}, ${flStr(th.y)}, ${flStr(th.z)})`;
+    text.setAttribute("value", `(${flStr(pos.x)}, ${flStr(pos.y)}, ${flStr(pos.z)})+${el.trigger}:${el.grip})`);
+    if (el.grip) {
+      // Grip がオンの時は、差分で動かす
+      var diff = new THREE.Vector3();
+      diff.subVectors(pos, el.startPos);
+      el.startPos = pos.clone();
+      set_target(prevtg => { return { x: prevtg.x + diff.x, y: prevtg.y + diff.y, z: prevtg.z + diff.z }; })
+      //          sendCurrentMQTT(this.el);
+    }
+  }
+
+  // 複数回登録しないための方策が必要
+  if (vr_init_first) { // 1回だけ実効
+    AFRAME.registerComponent("vr-controller", {
+      dependencies: ["raycaster"],// Important
+      init: function () {
+        const text = document.getElementById("my_controller");// 
+        const el = this.el;
+        el.grip = false; // initialize
+        el.trigger = false;
+        el.client = null;
+
+        // ここでMQTT はおかしい（手毎に？）
+        const client = new mqtt.connect("wss://sora2.uclab.jp/mqws");
+        console.log("New MQTT");
+        client.on("connect", () => {
+          console.log("Connected", this);
+          el.client = client;
+          const msg = JSON.stringify({ myID: uniqueId, type: "KINOVA" });
+          console.log("Send", msg);
+          client.publish("clients", msg);
+        });
+
+        text.setAttribute("value", "Controller is ready!!");
+
+        // grip が触られたタイミングで、現在位置を取得
+        this.el.addEventListener("griptouchstart", function (e) {
+          el.startPos = el.object3D.position.clone();
+          console.log("StartPos", el.startPos);
+          el.grip = true;
+          const tt = target;
+          el.target = { x: tt.x, y: tt.y, z: tt.z }; // 現在のターゲットも記録
+          console.log("Target!", tt);
+          // 同時に初期位置を送信すべき
+          //          console.log("GripStart!", e);
+          sendCurrentMQTT(el)
+        });
+        this.el.addEventListener("gripdown", function (e) {
+          if (!el.grip) {
+            el.startPos = el.object3D.position.clone();
+            console.log("StartPos", el.startPos);
+            const tt = ref_target.current
+            el.target = { x: tt.x, y: tt.y, z: tt.z }; // 現在のターゲットも記録
+            console.log("Target!", tt);
+            el.grip = true;
+          }
+          //              console.log("Grip!", el, e.target.compoennt.);
+        });
+        this.el.addEventListener("gripup", function (e) {
+          el.grip = false;
+          //          var tt = new THREE.Vector3();
+          //          this.object3D.getWorldPosition(tt)
+          //          console.log("world", tt);
+        });
+        el.addEventListener('triggertouchstart', function (event) {
+          console.log("touchStart");
+          el.trigger = true;
+        });
+        this.el.addEventListener("triggerdown", function (e) {
+          el.trigger = true;
+        });
+
+        this.el.addEventListener("triggerup", function (e) {
+          el.trigger = false;
+        });
+
+        this.el.addEventListener("raycaster-intersection", function (e) {
+          text.setAttribute("value", "Intersection:captured");
+        });
+
+        this.el.addEventListener("raycaster-intersection-cleared", function (e) {
+          text.setAttribute("value", "Intersection:cleared");
+        });
+        /*
+        el.addEventListener("pinchstarted", function (e) {
+          text.setAttribute("value", "PinchStart");
+        });
+        el.addEventListener("pinchended", function (e) {
+          text.setAttribute("value", "PinchEnd");
+        });
+    
+        el.addEventListener("pinchmoved", function (e) {
+          text.setAttribute("value", "PinchMove");
+          //          console.log("Move", e)//
+          const pos = e.target.object3D.position;
+          const rot = e.target.object3D.rotation;
+          //const rotstr = `(${this.flStr(rot.x)}, ${this.flStr(rot.y)}, ${this.flStr(rot.z)})`;
+          //text.setAttribute("value", `(${this.flStr(pos.x)}, ${this.flStr(pos.y)}, ${this.flStr(pos.z)})${rotstr}+${tref.current})`);
+    
+        });
+    */
+        text.setAttribute("value", "All OK");
+        //        console.log("Hand:", this.hand, this);
+
+      },
+      tick: function (time, delta) {
+        doTick(this.el);
+      }
+    });
+    vr_init_first = false;
+  }
+
+
+  // VR controller の登録
+  React.useEffect(() => {
+    //initialize MQTT over WebSocket
+
+    console.log("Register vr-controller");
+
+  }, []);
+
+
   React.useEffect(() => {
     if (typeof window !== "undefined") {
       require("aframe");
-      setTimeout(set_rendered(true),1000)
+      setTimeout(set_rendered(true), 1000)
       console.log('set_rendered')
 
-      if(!registered){
+      if (!registered) {
         registered = true
+        console.log("Registering..");
         AFRAME.registerComponent('robot-click', {
           init: function () {
-            this.el.addEventListener('click', (evt)=>{
+            this.el.addEventListener('click', (evt) => {
               robotChange()
               console.log('robot-click')
             });
@@ -303,51 +469,61 @@ export default function Home() {
     rotate, set_rotate, target, set_target
   }
 
-  const edit_pos = (posxyz)=>`${posxyz.x} ${posxyz.y} ${posxyz.z}`
+  const edit_pos = (posxyz) => `${posxyz.x} ${posxyz.y} ${posxyz.z}`
 
   const robotProps = {
     robotNameList, robotName, rotate, joint_pos, edit_pos
   }
 
-  if(rendered){
+  if (rendered) {
     return (
-    <>
-      <a-scene>
-        <a-sky color="#E2F4FF"></a-sky>
-        <Abox nodes={nodes} box_scale={box_scale} box_visible={box_visible} edit_pos={edit_pos}/>
-        <a-cone position={edit_pos(node1)} scale={box_scale} color="red" visible={box_visible}></a-cone>
-        <a-cone position={edit_pos(node2)} scale={box_scale} color="cyan" visible={box_visible}></a-cone>
-        <a-plane position="0 0 0" rotation="-90 0 0" width="1" height="1" color="#7BC8A4" shadow></a-plane>
-        <Assets/>
-        <Select_Robot {...robotProps}/>
-        <a-entity id="rig" position={edit_pos(c_pos)} rotation={`${c_deg.x} ${c_deg.y} ${c_deg.z}`}>
-          <a-camera id="camera" cursor="rayOrigin: mouse;" position="0 0 0"></a-camera>
-        </a-entity>
-        <a-sphere position={edit_pos(target)} scale="0.02 0.02 0.02" color="yellow" visible={true}></a-sphere>
-      </a-scene>
-      <Controller {...controllerProps}/>
-    </>
+      <>
+        <a-scene>
+          <a-sky color="#E2F4FF"></a-sky>
+          <Abox nodes={nodes} box_scale={box_scale} box_visible={box_visible} edit_pos={edit_pos} />
+          <a-cone position={edit_pos(node1)} scale={box_scale} color="red" visible={box_visible}></a-cone>
+          <a-cone position={edit_pos(node2)} scale={box_scale} color="cyan" visible={box_visible}></a-cone>
+          <a-plane position="0 0 0" rotation="-90 0 0" width="1" height="1" color="#7BC8A4" shadow></a-plane>
+          <Assets />
+          <Select_Robot {...robotProps} />
+          <a-entity id="rig" position={edit_pos(c_pos)} rotation={`${c_deg.x} ${c_deg.y} ${c_deg.z}`}>
+            <a-camera id="camera" cursor="rayOrigin: mouse;" position="0 0 0">
+              <a-text id="my_controller" value="***" position="0 -0.1 -2" scale="0.4 0.4 0.4" align="center" color="#000000"></a-text>
+
+            </a-camera>
+          </a-entity>
+          <a-entity laser-controls="hand: right;" raycaster="objects: .collidable; far: 5" vr-controller></a-entity>
+          {
+            //          <a-entity hand-tracking-controls="hand: right" raycaster="objects: .collidable; far: 5" vr-controller></a-entity>
+            //          <a-entity laser-controls="hand: right" raycaster="objects: .collidable; far: 5" vr-controller></a-entity>
+          }
+          <a-sphere position={edit_pos(target)} scale="0.02 0.02 0.02" color="yellow" visible={true}></a-sphere>
+
+
+        </a-scene>
+        <Controller {...controllerProps} />
+      </>
     );
-  }else{
-    return(
+  } else {
+    return (
       <a-scene>
-        <Assets/>
+        <Assets />
       </a-scene>
     )
   }
 }
 
-const Abox = (props)=>{
-  const {nodes,box_scale,box_visible,edit_pos} = props
-  const coltbl = ["red","green","blue","yellow"]
-  if(nodes.length > 0){
-    return nodes.map((node,idx)=><a-box key={idx} position={edit_pos(node)} scale={box_scale} color={coltbl[idx]} visible={true}></a-box>)
-  }else{
+const Abox = (props) => {
+  const { nodes, box_scale, box_visible, edit_pos } = props
+  const coltbl = ["red", "green", "blue", "yellow"]
+  if (nodes.length > 0) {
+    return nodes.map((node, idx) => <a-box key={idx} position={edit_pos(node)} scale={box_scale} color={coltbl[idx]} visible={true}></a-box>)
+  } else {
     return null
   }
 }
 
-const Assets = ()=>{
+const Assets = () => {
   return (
     <a-assets>
       {/*KINOVA Gen2*/}
@@ -364,9 +540,9 @@ const Assets = ()=>{
   )
 }
 
-const KINOVA_Gen2 = (props)=>{
-  const {visible, rotate, joint_pos, edit_pos} = props
-  return (<>{visible?
+const KINOVA_Gen2 = (props) => {
+  const { visible, rotate, joint_pos, edit_pos } = props
+  return (<>{visible ?
     <a-entity robot-click gltf-model="#KINOVA_BASE" position={edit_pos(joint_pos.base)} rotation="0 0 0" visible={visible}>
       <a-entity gltf-model="#KINOVA_J1" position={edit_pos(joint_pos.j1)} rotation={`0 ${rotate.j1} 0`}>
         <a-entity gltf-model="#KINOVA_J2" position={edit_pos(joint_pos.j2)} rotation={`${rotate.j2} 0 0`}>
@@ -383,20 +559,20 @@ const KINOVA_Gen2 = (props)=>{
           </a-entity>
         </a-entity>
       </a-entity>
-    </a-entity>:null}</>
+    </a-entity> : null}</>
   )
 }
 
-const Select_Robot = (props)=>{
-  const {robotNameList, robotName, ...rotateProps} = props
-  const visibletable = robotNameList.map(()=>false)
+const Select_Robot = (props) => {
+  const { robotNameList, robotName, ...rotateProps } = props
+  const visibletable = robotNameList.map(() => false)
   // const robotNameList = ["DOBOT Nova 2","Cobotta PRO 900","JAKA Zu 5"]
-  const findindex = robotNameList.findIndex((e)=>e===robotName)
-  if(findindex >= 0){
+  const findindex = robotNameList.findIndex((e) => e === robotName)
+  if (findindex >= 0) {
     visibletable[findindex] = true
   }
   return (<>
-    <KINOVA_Gen2 visible={visibletable[0]} {...rotateProps}/>
+    <KINOVA_Gen2 visible={visibletable[0]} {...rotateProps} />
   </>)
 }
 
