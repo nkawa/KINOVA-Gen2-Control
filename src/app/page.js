@@ -17,7 +17,7 @@ export default function Home() {
   const [c_pos, set_c_pos] = React.useState({ x: 0, y: 0.5, z: 1.2 })
   const [c_deg, set_c_deg] = React.useState({ x: 0, y: 0, z: 0 })
   const [source, set_source] = React.useState({ x: 0, y: 0, z: 0 })
-  const [target, set_target] = React.useState({ x: 0, y: 1.4, z: 0 })
+  const [target, set_target] = React.useState({ x: 0, y: 1.25, z: 0 })
   const [joint_length, set_joint_length] = React.useState([])
   const [nodes, set_nodes] = React.useState([])
   const [node1, set_node1] = React.useState({ x: 0, y: 0, z: 0 })
@@ -298,12 +298,15 @@ export default function Home() {
   }, []);
 
   const sendCurrentMQTT = (el) => {
+    //  各ジョイント情報も送りたい
+
     const msg = JSON.stringify(
       {
         grip: el.grip,
         toggle: el.toggle,
         pos: el.object3D.position,
         ori: el.object3D.rotation,
+        rotate: el.rotate,
       }
     );
     el.client.publish('kinova/state', msg);
@@ -320,18 +323,22 @@ export default function Home() {
     //    const th = new THREE.Vector3();
     //    el.object3D.getWorldPosition(th);
     //        const rotstr = `(${this.flStr(rot.x)}, ${this.flStr(rot.y)}, ${this.flStr(rot.z)})`;
-    //    const rotstr = `(${flStr(th.x)}, ${flStr(th.y)}, ${flStr(th.z)})`;
-    text.setAttribute("value", `(${flStr(pos.x)}, ${flStr(pos.y)}, ${flStr(pos.z)})+${el.trigger}:${el.grip})`);
+    var rotstr = "";
     if (el.grip) {
       // Grip がオンの時は、差分で動かす
       var diff = new THREE.Vector3();
       diff.subVectors(pos, el.startPos);
       el.startPos = pos.clone();
-      set_target(prevtg => { return { x: prevtg.x + diff.x, y: prevtg.y + diff.y, z: prevtg.z + diff.z }; })
-      //          sendCurrentMQTT(this.el);
+      set_target(prevtg => {
+        el.nxtgt = { x: prevtg.x + diff.x, y: prevtg.y + diff.y, z: prevtg.z + diff.z };
+        return el.nxtgt;
+      });
+      set_rotate(prevrt => { el.rotate = prevrt; return prevrt; });// just set rorate!
+      sendCurrentMQTT(el);
+      rotstr = `(${flStr(el.nxtgt.x)}, ${flStr(el.nxtgt.y)}, ${flStr(el.nxtgt.z)})`;
     }
+    text.setAttribute("value", `(${flStr(pos.x)}, ${flStr(pos.y)}, ${flStr(pos.z)})${rotstr}+${el.trigger}:${el.grip})`);
   }
-
   // 複数回登録しないための方策が必要
   if (vr_init_first) { // 1回だけ実効
     AFRAME.registerComponent("vr-controller", {
@@ -342,6 +349,8 @@ export default function Home() {
         el.grip = false; // initialize
         el.trigger = false;
         el.client = null;
+        el.rorate = null;
+        el.nxtgt = { x: 0, y: 0, z: 0 };
 
         // ここでMQTT はおかしい（手毎に？）
         const client = new mqtt.connect("wss://sora2.uclab.jp/mqws");
