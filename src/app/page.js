@@ -480,13 +480,13 @@ export default function Home() {
 
 
   // GUI から MQTT を送る
-  const sendMQTT = () => {
+  const sendMQTT = (tgt) => {
     if (mqttclient != null) {
       const msg = JSON.stringify(
         {
           grip: false,
           toggle: false,
-          pos: target,
+          pos: tgt,
           ori: { x: 0, y: 0, z: 0 },
           rotate: rotate,
         }
@@ -497,9 +497,14 @@ export default function Home() {
     }
   }
 
+  const set_MQTT_target = (tgt) => {
+    sendMQTT(tgt);
+    set_target(tgt);
+  }
+
   const controllerProps = {
     robotName, robotNameList, set_robotName,
-    rotate, set_rotate, target, set_target, sendMQTT
+    rotate, set_rotate, target, set_target
   }
 
   const edit_pos = (posxyz) => `${posxyz.x} ${posxyz.y} ${posxyz.z}`
