@@ -515,6 +515,7 @@ export default function Home() {
         }
       );
       mqttclient.publish('kinova/state', msg);
+      console.log("Send", msg)
     } else {
       console.log("MQTT ", mqttclient);
     }
