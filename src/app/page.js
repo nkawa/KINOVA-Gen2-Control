@@ -499,6 +499,7 @@ export default function Home() {
 
   const set_MQTT_target = (tgt) => {
     sendMQTT(tgt);
+    console.log("Send MQTT", tgt);
     set_target(tgt);
   }
 
