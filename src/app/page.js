@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';  // for unique ID
 
 const uniqueId = uuidv4(); // constant ID for client.
 var vr_init_first = true;
+var mqttclient = null; // MQTT
 
 export default function Home() {
   const [rendered, set_rendered] = React.useState(false)
@@ -316,6 +317,22 @@ export default function Home() {
     return Math.floor(v * 100) / 100;
   }
 
+  const connectMQTT = () => {
+    if (mqttclient == null) {
+      const client = new mqtt.connect("wss://sora2.uclab.jp/mqws");
+      console.log("New MQTT");
+      client.on("connect", () => {
+        console.log("Connected", this);
+        el.client = client;
+        const msg = JSON.stringify({ myID: uniqueId, type: "KINOVA" });
+        console.log("Send", msg);
+        client.publish("clients", msg);
+      });
+      mqttclient = client;
+    }
+    return mqttclient
+  }
+
   const doTick = (el) => {
     const text = document.getElementById("my_controller");// 
     const pos = el.object3D.position;
@@ -348,20 +365,9 @@ export default function Home() {
         const el = this.el;
         el.grip = false; // initialize
         el.trigger = false;
-        el.client = null;
         el.rorate = null;
         el.nxtgt = { x: 0, y: 0, z: 0 };
-
-        // ここでMQTT はおかしい（手毎に？）
-        const client = new mqtt.connect("wss://sora2.uclab.jp/mqws");
-        console.log("New MQTT");
-        client.on("connect", () => {
-          console.log("Connected", this);
-          el.client = client;
-          const msg = JSON.stringify({ myID: uniqueId, type: "KINOVA" });
-          console.log("Send", msg);
-          client.publish("clients", msg);
-        });
+        el.client = connectMQTT();
 
         text.setAttribute("value", "Controller is ready!!");
 
@@ -473,9 +479,28 @@ export default function Home() {
     }
   }, [typeof window])
 
+
+  // GUI から MQTT を送る
+  const sendMQTT = () => {
+    if (mqttclient != null) {
+      const msg = JSON.stringify(
+        {
+          grip: false,
+          toggle: false,
+          pos: target,
+          ori: { x: 0, y: 0, z: 0 },
+          rotate: rotate,
+        }
+      );
+      mqttclient.publish('kinova/state', msg);
+    } else {
+      console.log("MQTT ", mqttclient);
+    }
+  }
+
   const controllerProps = {
     robotName, robotNameList, set_robotName,
-    rotate, set_rotate, target, set_target
+    rotate, set_rotate, target, set_target, sendMQTT
   }
 
   const edit_pos = (posxyz) => `${posxyz.x} ${posxyz.y} ${posxyz.z}`
