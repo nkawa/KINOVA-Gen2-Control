@@ -323,7 +323,6 @@ export default function Home() {
       console.log("New MQTT");
       client.on("connect", () => {
         console.log("Connected", this);
-        el.client = client;
         const msg = JSON.stringify({ myID: uniqueId, type: "KINOVA" });
         console.log("Send", msg);
         client.publish("clients", msg);
