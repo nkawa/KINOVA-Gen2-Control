@@ -487,8 +487,10 @@ export default function Home() {
   if (rendered) {
     return (
       <>
-        <a-scene>
-          <a-sky color="#E2F4FF"></a-sky>
+        <a-scene xr-mode-ui="enterAREnabled: true">
+          {
+            //         <a-sky color="#E2F4FF"></a-sky>
+          }
           <Abox nodes={nodes} box_scale={box_scale} box_visible={box_visible} edit_pos={edit_pos} />
           <a-cone position={edit_pos(node1)} scale={box_scale} color="red" visible={box_visible}></a-cone>
           <a-cone position={edit_pos(node2)} scale={box_scale} color="cyan" visible={box_visible}></a-cone>
