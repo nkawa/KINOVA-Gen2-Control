@@ -505,7 +505,7 @@ export default function Home() {
 
   const controllerProps = {
     robotName, robotNameList, set_robotName,
-    rotate, set_rotate, target, set_MQTT_target
+    rotate, set_rotate, target, set_target: set_MQTT_target
   }
 
   const edit_pos = (posxyz) => `${posxyz.x} ${posxyz.y} ${posxyz.z}`
