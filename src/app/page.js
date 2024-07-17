@@ -498,10 +498,33 @@ export default function Home() {
   }
 
   const set_MQTT_target = (tgt) => {
-    sendMQTT(tgt);
-    console.log("Send MQTT", tgt);
+    //    sendMQTT(tgt);
+    //    console.log("Send MQTT", tgt);
     set_target(tgt);
   }
+
+  React.useEffect(() => {
+    if (mqttclient != null) {
+      const msg = JSON.stringify(
+        {
+          grip: false,
+          toggle: false,
+          pos: target,
+          ori: { x: 0, y: 0, z: 0 },
+          rotate: rotate,
+        }
+      );
+      mqttclient.publish('kinova/state', msg);
+    } else {
+      console.log("MQTT ", mqttclient);
+    }
+  }, [rotate])
+
+  const set_MQTT_rotate = (joint) => {
+    //    console.log("Send MQTT", tgt);
+    set_target(tgt);
+  }
+
 
   const controllerProps = {
     robotName, robotNameList, set_robotName,
