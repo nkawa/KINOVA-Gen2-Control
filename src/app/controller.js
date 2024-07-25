@@ -1,10 +1,12 @@
 "use client";
 import * as React from 'react'
+import { Button } from 'react-bootstrap'
 import "./controller.css";
+
 
 export default function Controller(props) {
   const { robotNameList, robotName } = props
-  const { rotate, target } = props
+  const { rotate, target, mqttRecv } = props
 
   const set_robotName = (e) => {
     props.set_robotName(e.target.value)
@@ -71,8 +73,10 @@ export default function Controller(props) {
     props.set_target({ ...target, z: value })
   }
 
+
+
   return (
-    <>
+    <div>
       <div className="controller" >
         {/*<div className="mb-2">
           <select className="form-select" onChange={set_robotName} value={robotName}>
@@ -118,11 +122,12 @@ export default function Controller(props) {
           <div className="col-md-4"><label htmlFor="target_z_number" className="form-label"><span className="form-control-plaintext">target z</span></label></div>
           <div className="col-md-8"><input type="number" className="form-control" id="target_z_number" value={target.z} onChange={set_target_z} step={0.01} min={-10} max={10} /></div>
         </div>
-        <div> className="row mb-2">
-          <div className="col-md-4"><span className="form-control-plaintext">MQTT recv</span></label></div>
-        <div className="col-md-8"><Button>MQTT</Button>  </div>
+        <div className="row mb-2">
+          <div className="col-md-4"><label><span className="form-control-plaintext">MQTT</span></label></div>
+          <div className="col-md-8"><Button onClick={mqttRecv}> MQTT Receive</Button>  </div>
+
+        </div>
       </div>
-    </div >
-    </>
-    
+    </div>
+  );
 }

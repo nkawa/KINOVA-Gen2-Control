@@ -15,6 +15,7 @@
     "mqtt": "^5.8.0",
     "next": "14.2.4",
     "react": "^18",
+    "react-bootstrap": "^2.10.4",
     "react-dom": "^18",
     "uuid": "^10.0.0"
   }

@@ -6,9 +6,12 @@ import { THREE } from 'aframe';
 import mqtt from 'mqtt';
 import { v4 as uuidv4 } from 'uuid';  // for unique ID 
 
-const uniqueId = uuidv4(); // constant ID for client.
+//const uniqueId = uuidv4(); // constant ID for client.
+
+const uniqueId = "unique";//uuidv4(); // constant ID for client.
 var vr_init_first = true;
 var mqttclient = null; // MQTT
+var mqttRecvToggle = false;
 
 export default function Home() {
   const [rendered, set_rendered] = React.useState(false)
@@ -527,12 +530,31 @@ export default function Home() {
   }
 
 
+  const mqttRecv = (e) => {
+    console.log("MQTT receive pushed")
+    if (mqttRecvToggle) {
+      mqttRecvToggle = false;
+      mqttclient.unsubscribe("kinova/real")
+    } else {
+      if (mqttclient == null) {
+        connectMQTT()
+
+      }
+      mqttclient.subscribe("kinova/real")
+      console.log("SubScribe  kinova/real")
+      mqttclient.handleMessage = (packet, callback) => {
+        console.log("packet", packet);
+      }
+    }
+
+  }
   const controllerProps = {
     robotName, robotNameList, set_robotName,
-    rotate, set_rotate, target, set_target
+    rotate, set_rotate, target, set_target, mqttRecv
   }
 
   const edit_pos = (posxyz) => `${posxyz.x} ${posxyz.y} ${posxyz.z}`
+
 
   const robotProps = {
     robotNameList, robotName, rotate, joint_pos, edit_pos
